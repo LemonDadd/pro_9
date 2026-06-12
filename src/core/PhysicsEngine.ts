@@ -29,7 +29,7 @@ export class PhysicsEngine {
     this.centerY = centerY;
 
     this.engine = Engine.create({
-      gravity: { x: 0, y: PHYSICS.gravity, scale: 0.001 }
+      gravity: { x: 0, y: PHYSICS.gravity, scale: 0.01 }
     });
     this.world = this.engine.world;
     this.runner = Runner.create();
@@ -110,29 +110,65 @@ export class PhysicsEngine {
     const segments: Matter.Body[] = [];
     const outerRadius = this.ringRadius;
     const innerRadius = this.ringRadius - this.ringThickness;
-    const totalAngle = 2 * Math.PI;
+
+    const toPositive = (a: number): number => {
+      while (a < 0) a += 2 * Math.PI;
+      while (a >= 2 * Math.PI) a -= 2 * Math.PI;
+      return a;
+    };
+
+    const gapRanges: { start: number; end: number }[] = [];
+
+    for (const gap of this.gaps) {
+      let gapStart = toPositive(gap.startAngle);
+      let gapEnd = toPositive(gap.endAngle);
+
+      if (gapEnd < gapStart) {
+        gapEnd += 2 * Math.PI;
+      }
+
+      if (gapEnd - gapStart >= 2 * Math.PI - 0.01) {
+        continue;
+      }
+
+      gapRanges.push({ start: gapStart, end: gapEnd });
+
+      if (gapEnd > 2 * Math.PI) {
+        gapRanges.push({ start: 0, end: gapEnd - 2 * Math.PI });
+        gapRanges[gapRanges.length - 2].end = 2 * Math.PI;
+      }
+    }
+
+    gapRanges.sort((a, b) => a.start - b.start);
 
     const ringArcs: { start: number; end: number }[] = [];
-    let currentAngle = -Math.PI;
+    let currentAngle = 0;
 
-    const sortedGaps = [...this.gaps].sort((a, b) => a.startAngle - b.startAngle);
-
-    sortedGaps.forEach((gap) => {
-      const gapStart = normalizeAngle(gap.startAngle);
-      const gapEnd = normalizeAngle(gap.endAngle);
-
-      if (currentAngle < gapStart) {
-        ringArcs.push({ start: currentAngle, end: gapStart });
+    for (const gap of gapRanges) {
+      if (currentAngle < gap.start) {
+        ringArcs.push({ start: currentAngle, end: gap.start });
       }
-      currentAngle = gapEnd;
-    });
+      currentAngle = Math.max(currentAngle, gap.end);
+    }
 
-    if (currentAngle < Math.PI) {
-      ringArcs.push({ start: currentAngle, end: Math.PI });
+    if (currentAngle < 2 * Math.PI) {
+      ringArcs.push({ start: currentAngle, end: 2 * Math.PI });
+    }
+
+    for (let i = ringArcs.length - 1; i >= 0; i--) {
+      const arc = ringArcs[i];
+      if (arc.end - arc.start < 0.001) {
+        ringArcs.splice(i, 1);
+      }
     }
 
     ringArcs.forEach((arc) => {
-      const segment = this.createArcSegment(arc.start, arc.end, innerRadius, outerRadius);
+      const segment = this.createArcSegment(
+        arc.start - Math.PI,
+        arc.end - Math.PI,
+        innerRadius,
+        outerRadius
+      );
       segments.push(segment);
     });
 
@@ -189,16 +225,21 @@ export class PhysicsEngine {
   }
 
   private rebuildRing(): void {
-    this.ringBodies.forEach((body) => {
-      World.remove(this.world, body);
-    });
+    const bodiesToRemove = [...this.ringBodies];
     this.ringBodies = [];
+
+    bodiesToRemove.forEach((body) => {
+      Composite.remove(this.world, body, true);
+    });
 
     const segments = this.createRingSegments();
     segments.forEach((segment) => {
+      segment.id = Matter.Common.nextId();
       World.add(this.world, segment);
       this.ringBodies.push(segment);
     });
+
+    this.engine.pairs.clear(this.engine.pairs);
   }
 
   private createBalls(count: number, restitution: number, friction: number, frictionAir: number): void {

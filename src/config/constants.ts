@@ -15,7 +15,7 @@ export const COLORS = {
 };
 
 export const PHYSICS = {
-  gravity: 0.4,
+  gravity: 1.0,
   defaultRestitution: 0.95,
   defaultFriction: 0,
   defaultFrictionAir: 0,
