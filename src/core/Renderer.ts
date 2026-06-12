@@ -183,6 +183,8 @@ export class Renderer {
   }
 
   private drawTrail(trail: TrailPoint[], color: string): void {
+    if (trail.length < 2) return;
+
     this.ctx.save();
     this.ctx.lineCap = 'round';
     this.ctx.lineJoin = 'round';
@@ -190,11 +192,21 @@ export class Renderer {
     for (let i = 1; i < trail.length; i++) {
       const prev = trail[i - 1];
       const curr = trail[i];
-      const alpha = curr.alpha * 0.6;
 
-      this.ctx.strokeStyle = color;
+      const progress = i / trail.length;
+      const alpha = progress * curr.alpha * 0.8;
+      const size = curr.size * progress * 0.9 + 1;
+      const speedGlow = Math.min(curr.speed / 15, 1);
+
+      const gradient = this.ctx.createLinearGradient(prev.x, prev.y, curr.x, curr.y);
+      gradient.addColorStop(0, color);
+      gradient.addColorStop(1, this.lightenColor(color, 0.3));
+
+      this.ctx.strokeStyle = gradient;
       this.ctx.globalAlpha = alpha;
-      this.ctx.lineWidth = 4 * curr.alpha;
+      this.ctx.lineWidth = size;
+      this.ctx.shadowColor = color;
+      this.ctx.shadowBlur = 10 + speedGlow * 15;
 
       this.ctx.beginPath();
       this.ctx.moveTo(prev.x, prev.y);
@@ -203,6 +215,14 @@ export class Renderer {
     }
 
     this.ctx.restore();
+  }
+
+  private lightenColor(color: string, amount: number): string {
+    const hex = color.replace('#', '');
+    const r = Math.min(255, parseInt(hex.substring(0, 2), 16) * (1 + amount));
+    const g = Math.min(255, parseInt(hex.substring(2, 4), 16) * (1 + amount));
+    const b = Math.min(255, parseInt(hex.substring(4, 6), 16) * (1 + amount));
+    return `rgb(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)})`;
   }
 
   drawParticles(particles: Particle[]): void {

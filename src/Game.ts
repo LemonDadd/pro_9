@@ -85,13 +85,22 @@ export class Game {
   }
 
   private setupInputHandlers(): void {
-    this.input.onDrag((start, end) => {
-      if (this.state !== 'PLAYING' || !this.currentLevel) return;
+    this.input.onMove((current, delta) => {
+      if (this.state !== 'PLAYING' && this.state !== 'COUNTDOWN') return;
 
-      if (this.currentLevel.targetAllBalls) {
-        this.physics.applyTangentialForceToAll(start, end, this.currentLevel.forceMultiplier);
-      } else {
-        this.physics.applyTangentialForceToNearest(start, end, this.currentLevel.forceMultiplier);
+      const center = this.renderer.getCenter();
+      const prevAngle = Math.atan2(current.y - delta.y - center.y, current.x - delta.x - center.x);
+      const currentAngle = Math.atan2(current.y - center.y, current.x - center.x);
+
+      let deltaAngle = currentAngle - prevAngle;
+      if (deltaAngle > Math.PI) deltaAngle -= 2 * Math.PI;
+      if (deltaAngle < -Math.PI) deltaAngle += 2 * Math.PI;
+
+      const sensitivity = GAME.ringRotationSensitivity;
+      const rotation = deltaAngle * sensitivity * 100;
+
+      if (Math.abs(rotation) > 0.001) {
+        this.physics.rotateRing(rotation);
       }
     });
   }
@@ -236,22 +245,9 @@ export class Game {
     if (!this.currentLevel) return false;
 
     const { goal } = this.currentLevel;
-    const surviveSeconds = this.score.getSurviveTimeInSeconds();
     const hitCount = this.score.getHitCount();
 
-    switch (goal.type) {
-      case 'SURVIVE':
-        return surviveSeconds >= (goal.surviveSeconds || 0);
-      case 'HITS':
-        return hitCount >= (goal.hitCount || 0);
-      case 'HYBRID':
-        return (
-          surviveSeconds >= (goal.surviveSeconds || 0) &&
-          hitCount >= (goal.hitCount || 0)
-        );
-      default:
-        return false;
-    }
+    return hitCount >= (goal.hitCount || 0);
   }
 
   private handleLevelComplete(): void {
@@ -268,7 +264,7 @@ export class Game {
     const levelScore = this.score.getScore();
     const bonus = this.score.calculateLevelBonus(
       this.currentLevel.ballCount,
-      this.currentLevel.goal.surviveSeconds
+      this.currentLevel.goal.hitCount
     );
     const totalScore = this.score.getTotalScore();
 
@@ -315,7 +311,7 @@ export class Game {
       const isNewHighScore = totalScore > this.storage.getHighScore();
       this.storage.setHighScore(totalScore);
 
-      const reason = failureInfo.reason === 'gap_escape' ? '小球从缺口逃出了！' : '小球越出了边界！';
+      const reason = failureInfo.reason === 'gap_escape' ? '小球从缺口掉落了！' : '小球越出了边界！';
 
       this.ui.showGameOver(totalScore, this.storage.getHighScore(), reason, isNewHighScore);
       this.updateUI();
@@ -417,16 +413,19 @@ export class Game {
         this.ballTrails.set(ball.id, trail);
       }
 
-      const speedFactor = Math.min(ball.speed / 15, 1);
-      const alpha = 0.3 + speedFactor * 0.7;
+      const speedFactor = Math.min(ball.speed / 20, 1);
+      const alpha = 0.4 + speedFactor * 0.6;
+      const size = ball.radius * (0.3 + speedFactor * 0.7);
 
       trail.push({
         x: ball.x,
         y: ball.y,
-        alpha
+        alpha,
+        size,
+        speed: ball.speed
       });
 
-      const maxLength = Math.floor(GAME.trailLength * (0.5 + speedFactor * 0.5));
+      const maxLength = Math.floor(GAME.trailLength * (0.6 + speedFactor * 0.4));
       if (trail.length > maxLength) {
         trail.shift();
       }

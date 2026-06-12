@@ -1,4 +1,5 @@
 type DragCallback = (start: { x: number; y: number }, end: { x: number; y: number }) => void;
+type MoveCallback = (current: { x: number; y: number }, delta: { x: number; y: number }) => void;
 type ClickCallback = (position: { x: number; y: number }) => void;
 
 export class InputController {
@@ -7,8 +8,10 @@ export class InputController {
   private dragStart: { x: number; y: number } | null = null;
   private dragCurrent: { x: number; y: number } | null = null;
   private lastDragPosition: { x: number; y: number } | null = null;
+  private lastMousePosition: { x: number; y: number } | null = null;
   private dragCallbacks: DragCallback[] = [];
   private dragEndCallbacks: DragCallback[] = [];
+  private moveCallbacks: MoveCallback[] = [];
   private clickCallbacks: ClickCallback[] = [];
   private isPaused: boolean = false;
 
@@ -47,10 +50,22 @@ export class InputController {
   }
 
   private handleMouseMove(e: MouseEvent): void {
-    if (this.isPaused || !this.isDragging) return;
+    if (this.isPaused) return;
     e.preventDefault();
     const pos = this.getCanvasPosition(e);
-    this.updateDrag(pos);
+
+    if (this.lastMousePosition) {
+      const delta = {
+        x: pos.x - this.lastMousePosition.x,
+        y: pos.y - this.lastMousePosition.y
+      };
+      this.moveCallbacks.forEach((cb) => cb(pos, delta));
+    }
+    this.lastMousePosition = { ...pos };
+
+    if (this.isDragging) {
+      this.updateDrag(pos);
+    }
   }
 
   private handleMouseUp(e: MouseEvent): void {
@@ -144,6 +159,10 @@ export class InputController {
     this.clickCallbacks.push(callback);
   }
 
+  onMove(callback: MoveCallback): void {
+    this.moveCallbacks.push(callback);
+  }
+
   pause(): void {
     this.isPaused = true;
     if (this.isDragging && this.lastDragPosition) {
@@ -180,6 +199,7 @@ export class InputController {
 
     this.dragCallbacks = [];
     this.dragEndCallbacks = [];
+    this.moveCallbacks = [];
     this.clickCallbacks = [];
   }
 }

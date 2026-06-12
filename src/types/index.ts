@@ -49,6 +49,8 @@ export interface TrailPoint {
   x: number;
   y: number;
   alpha: number;
+  size: number;
+  speed: number;
 }
 
 export interface Particle {

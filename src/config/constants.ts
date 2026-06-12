@@ -15,14 +15,14 @@ export const COLORS = {
 };
 
 export const PHYSICS = {
-  gravity: 0.3,
-  defaultRestitution: 0.9,
-  defaultFriction: 0.05,
-  defaultFrictionAir: 0.01,
+  gravity: 0.4,
+  defaultRestitution: 0.95,
+  defaultFriction: 0,
+  defaultFrictionAir: 0,
   ringThickness: 20,
   ballRadius: 12,
-  maxBallSpeed: 20,
-  minBallSpeed: 1
+  maxBallSpeed: 25,
+  minBallSpeed: 2
 };
 
 export const RING_RADIUS: Record<string, number> = {
@@ -32,22 +32,21 @@ export const RING_RADIUS: Record<string, number> = {
 };
 
 export const SCORE = {
-  survivePerSecond: 10,
-  hitBase: 5,
-  maxComboMultiplier: 3,
-  comboWindow: 2000,
-  timeBonusPerSecond: 50,
-  ballBonus: 100
+  hitBase: 100,
+  maxComboMultiplier: 5,
+  comboWindow: 3000,
+  ballBonus: 200
 };
 
 export const GAME = {
   targetFPS: 60,
   slowMotionDuration: 300,
   slowMotionScale: 0.3,
-  trailLength: 20,
+  trailLength: 60,
   particleCount: 15,
   gapWarningAngle: 15 * Math.PI / 180,
-  maxBalls: 6
+  maxBalls: 6,
+  ringRotationSensitivity: 0.008
 };
 
 export const STORAGE_KEY = 'ring_gap_keeper_save';

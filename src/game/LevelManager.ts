@@ -64,15 +64,6 @@ export class LevelManager {
 
   getGoalDescription(level: LevelConfig): string {
     const { goal } = level;
-    switch (goal.type) {
-      case 'SURVIVE':
-        return `坚持 ${goal.surviveSeconds} 秒`;
-      case 'HITS':
-        return `碰撞墙壁 ${goal.hitCount} 次`;
-      case 'HYBRID':
-        return `坚持 ${goal.surviveSeconds} 秒且碰撞 ${goal.hitCount} 次`;
-      default:
-        return '';
-    }
+    return `反弹 ${goal.hitCount} 次`;
   }
 }

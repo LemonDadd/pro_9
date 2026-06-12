@@ -55,17 +55,6 @@ export class ScoreManager {
 
   update(deltaTime: number, currentTime: number): void {
     this.surviveTime += deltaTime;
-
-    if (currentTime - this.lastSurviveScoreTime >= 1000) {
-      this.addSurviveScore();
-      this.lastSurviveScoreTime = currentTime;
-    }
-  }
-
-  private addSurviveScore(): void {
-    const points = SCORE.survivePerSecond;
-    this.score += points;
-    this.totalScore += points;
   }
 
   addHitScore(): { points: number; combo: number } {
@@ -77,13 +66,8 @@ export class ScoreManager {
     return { points, combo: multiplier };
   }
 
-  calculateLevelBonus(levelBallCount: number, targetSurviveSeconds?: number): number {
+  calculateLevelBonus(levelBallCount: number, targetHitCount?: number): number {
     let bonus = 0;
-
-    if (targetSurviveSeconds && this.surviveTime / 1000 < targetSurviveSeconds) {
-      const remainingTime = targetSurviveSeconds - this.surviveTime / 1000;
-      bonus += Math.floor(remainingTime * SCORE.timeBonusPerSecond);
-    }
 
     bonus += levelBallCount * SCORE.ballBonus;
 

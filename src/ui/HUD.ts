@@ -84,20 +84,12 @@ export class HUD {
     this.levelElement.textContent = `第 ${level.id} 关`;
 
     const { goal } = level;
-    if (goal.type === 'SURVIVE') {
-      const remaining = Math.max(0, (goal.surviveSeconds || 0) - surviveSeconds);
-      this.goalElement.textContent = `目标: 坚持 ${goal.surviveSeconds}s`;
-      this.timeElement.textContent = `剩余: ${remaining.toFixed(1)}s`;
-    } else if (goal.type === 'HITS') {
-      this.goalElement.textContent = `目标: 碰撞 ${goal.hitCount} 次`;
-      this.timeElement.textContent = `时间: ${surviveSeconds.toFixed(1)}s`;
-    } else if (goal.type === 'HYBRID') {
-      const remaining = Math.max(0, (goal.surviveSeconds || 0) - surviveSeconds);
-      this.goalElement.textContent = `目标: 坚持 ${goal.surviveSeconds}s 碰撞 ${goal.hitCount} 次`;
-      this.timeElement.textContent = `剩余: ${remaining.toFixed(1)}s`;
-    }
+    const targetHits = goal.hitCount || 0;
+    const remaining = Math.max(0, targetHits - hitCount);
 
-    this.hitsElement.textContent = `碰撞: ${hitCount}`;
+    this.goalElement.textContent = `目标: 反弹 ${targetHits} 次`;
+    this.hitsElement.textContent = `已反弹: ${hitCount} / ${targetHits}`;
+    this.timeElement.textContent = `剩余: ${remaining} 次`;
 
     if (combo >= 2) {
       this.comboElement.textContent = `COMBO x${combo}`;

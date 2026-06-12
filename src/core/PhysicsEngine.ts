@@ -240,79 +240,27 @@ export class PhysicsEngine {
     return ball;
   }
 
-  applyTangentialForceToNearest(dragStart: { x: number; y: number }, dragEnd: { x: number; y: number }, forceMultiplier: number): void {
-    const nearestBall = this.findNearestBallToCenter();
-    if (!nearestBall) return;
-
-    this.applyTangentialForce(nearestBall, dragStart, dragEnd, forceMultiplier);
-  }
-
-  applyTangentialForceToAll(dragStart: { x: number; y: number }, dragEnd: { x: number; y: number }, forceMultiplier: number): void {
-    this.balls.forEach((ball) => {
-      this.applyTangentialForce(ball, dragStart, dragEnd, forceMultiplier);
-    });
-  }
-
-  private applyTangentialForce(
-    ball: Matter.Body,
-    dragStart: { x: number; y: number },
-    dragEnd: { x: number; y: number },
-    forceMultiplier: number
-  ): void {
-    const ballAngle = Math.atan2(ball.position.y - this.centerY, ball.position.x - this.centerX);
-
-    const dragDx = dragEnd.x - dragStart.x;
-    const dragDy = dragEnd.y - dragStart.y;
-
-    const tangentX = -Math.sin(ballAngle);
-    const tangentY = Math.cos(ballAngle);
-
-    const tangentialComponent = dragDx * tangentX + dragDy * tangentY;
-
-    const forceMagnitude = tangentialComponent * forceMultiplier;
-
-    Body.applyForce(ball, ball.position, {
-      x: tangentX * forceMagnitude,
-      y: tangentY * forceMagnitude
+  rotateRing(deltaAngle: number): void {
+    this.gapConfigs.forEach((config, index) => {
+      config.startAngle = normalizeAngle(config.startAngle + deltaAngle);
+      this.gaps[index] = {
+        startAngle: config.startAngle,
+        endAngle: config.startAngle + config.angleWidth,
+        centerAngle: config.startAngle + config.angleWidth / 2
+      };
     });
 
-    const speed = Math.sqrt(ball.velocity.x ** 2 + ball.velocity.y ** 2);
-    if (speed > PHYSICS.maxBallSpeed) {
-      const scale = PHYSICS.maxBallSpeed / speed;
-      Body.setVelocity(ball, {
-        x: ball.velocity.x * scale,
-        y: ball.velocity.y * scale
-      });
-    }
-  }
-
-  private findNearestBallToCenter(): Matter.Body | null {
-    if (this.balls.length === 0) return null;
-
-    let nearest = this.balls[0];
-    let minDist = distance(nearest.position.x, nearest.position.y, this.centerX, this.centerY);
-
-    for (let i = 1; i < this.balls.length; i++) {
-      const dist = distance(this.balls[i].position.x, this.balls[i].position.y, this.centerX, this.centerY);
-      if (dist < minDist) {
-        minDist = dist;
-        nearest = this.balls[i];
-      }
-    }
-
-    return nearest;
+    this.rebuildRing();
   }
 
   checkFailure(): FailureInfo | null {
-    const innerRadius = this.ringRadius - this.ringThickness;
-
     for (const ball of this.balls) {
       const dx = ball.position.x - this.centerX;
       const dy = ball.position.y - this.centerY;
       const dist = Math.sqrt(dx * dx + dy * dy);
       const angle = Math.atan2(dy, dx);
 
-      if (dist > innerRadius) {
+      if (dist > this.ringRadius + this.ballRadius) {
         for (const gap of this.gaps) {
           if (isAngleInRange(angle, gap.startAngle, gap.endAngle)) {
             return {
@@ -323,15 +271,6 @@ export class PhysicsEngine {
             };
           }
         }
-      }
-
-      if (dist > this.ringRadius + this.ballRadius) {
-        return {
-          ballId: parseInt(ball.label),
-          reason: 'out_of_bounds',
-          position: { ...ball.position },
-          velocity: { ...ball.velocity }
-        };
       }
     }
 
