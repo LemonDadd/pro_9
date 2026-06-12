@@ -1,7 +1,10 @@
 import Matter from 'matter-js';
+import decomp from 'poly-decomp';
 import { PHYSICS, RING_RADIUS, COLORS } from '../config/constants';
 import { normalizeAngle, isAngleInRange, angleDistance, distance } from '../utils/math';
 import type { Gap, FailureInfo, CollisionEvent, LevelConfig, BallData } from '../types';
+
+Matter.Common.setDecomp(decomp);
 
 const { Engine, World, Bodies, Body, Runner, Events, Composite } = Matter;
 
@@ -200,22 +203,17 @@ export class PhysicsEngine {
 
   private createBalls(count: number, restitution: number, friction: number, frictionAir: number): void {
     for (let i = 0; i < count; i++) {
-      const angle = (i / count) * Math.PI * 2;
-      const distanceFromCenter = this.ringRadius * 0.4;
-      const x = this.centerX + Math.cos(angle) * distanceFromCenter;
-      const y = this.centerY + Math.sin(angle) * distanceFromCenter;
+      const offsetAngle = (i / count) * Math.PI * 2;
+      const offsetDistance = count > 1 ? 30 : 0;
+      const x = this.centerX + Math.cos(offsetAngle) * offsetDistance;
+      const y = this.centerY + Math.sin(offsetAngle) * offsetDistance;
 
       const color = COLORS.ballColors[i % COLORS.ballColors.length];
       const ball = this.createBall(x, y, color, restitution, friction, frictionAir, i);
       this.balls.push(ball);
       this.ballColors.set(i, color);
 
-      const initialSpeed = 5;
-      const tangentAngle = angle + Math.PI / 2;
-      Body.setVelocity(ball, {
-        x: Math.cos(tangentAngle) * initialSpeed,
-        y: Math.sin(tangentAngle) * initialSpeed
-      });
+      Body.setVelocity(ball, { x: 0, y: 0 });
     }
   }
 
@@ -327,7 +325,7 @@ export class PhysicsEngine {
         }
       }
 
-      if (dist > this.ringRadius - this.ringThickness - this.ballRadius) {
+      if (dist > this.ringRadius + this.ballRadius) {
         return {
           ballId: parseInt(ball.label),
           reason: 'out_of_bounds',

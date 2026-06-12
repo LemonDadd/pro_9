@@ -1,4 +1,4 @@
-export type GameState = 'MENU' | 'LEVEL_SELECT' | 'PLAYING' | 'PAUSED' | 'GAME_OVER' | 'LEVEL_COMPLETE';
+export type GameState = 'MENU' | 'LEVEL_SELECT' | 'COUNTDOWN' | 'PLAYING' | 'PAUSED' | 'GAME_OVER' | 'LEVEL_COMPLETE';
 
 export type GoalType = 'SURVIVE' | 'HITS' | 'HYBRID';
 

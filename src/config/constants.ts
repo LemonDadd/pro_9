@@ -15,7 +15,7 @@ export const COLORS = {
 };
 
 export const PHYSICS = {
-  gravity: 0,
+  gravity: 0.3,
   defaultRestitution: 0.9,
   defaultFriction: 0.05,
   defaultFrictionAir: 0.01,
@@ -26,9 +26,9 @@ export const PHYSICS = {
 };
 
 export const RING_RADIUS: Record<string, number> = {
-  small: 140,
-  medium: 180,
-  large: 220
+  small: 180,
+  medium: 240,
+  large: 300
 };
 
 export const SCORE = {

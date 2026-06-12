@@ -259,6 +259,32 @@ export class Renderer {
     this.ctx.restore();
   }
 
+  drawCountdown(number: number, scale: number): void {
+    this.ctx.save();
+
+    const displayText = number > 0 ? number.toString() : 'GO!';
+    const fontSize = 120 * scale;
+
+    this.ctx.font = `bold ${fontSize}px Orbitron, sans-serif`;
+    this.ctx.textAlign = 'center';
+    this.ctx.textBaseline = 'middle';
+
+    const gradient = this.ctx.createRadialGradient(
+      this.centerX, this.centerY, 0,
+      this.centerX, this.centerY, fontSize
+    );
+    gradient.addColorStop(0, '#ffffff');
+    gradient.addColorStop(0.5, number > 0 ? COLORS.accent : COLORS.success);
+    gradient.addColorStop(1, number > 0 ? COLORS.ring : COLORS.success);
+
+    this.ctx.fillStyle = gradient;
+    this.ctx.shadowColor = number > 0 ? COLORS.accent : COLORS.success;
+    this.ctx.shadowBlur = 30 * scale;
+    this.ctx.fillText(displayText, this.centerX, this.centerY);
+
+    this.ctx.restore();
+  }
+
   private darkenColor(color: string, amount: number): string {
     const hex = color.replace('#', '');
     const r = Math.max(0, parseInt(hex.substring(0, 2), 16) * (1 - amount));

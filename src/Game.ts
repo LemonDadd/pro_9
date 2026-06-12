@@ -30,6 +30,8 @@ export class Game {
   private levelCompleteFlash: number = 0;
   private ballTrails: Map<number, TrailPoint[]> = new Map();
   private currentLevel: LevelConfig | null = null;
+  private countdownTimer: number = 0;
+  private countdownNumber: number = 3;
 
   constructor(canvas: HTMLCanvasElement, appContainer: HTMLElement) {
     this.canvas = canvas;
@@ -112,13 +114,15 @@ export class Game {
     this.slowMotionTimer = 0;
     this.slowMotionActive = false;
     this.levelCompleteFlash = 0;
+    this.countdownTimer = 0;
+    this.countdownNumber = 3;
 
     const center = this.renderer.getCenter();
     this.physics.setupLevel(level, center.x, center.y);
+    this.physics.setSpeed(0);
     this.physics.start();
-    this.physics.setSpeed(1);
 
-    this.state = 'PLAYING';
+    this.state = 'COUNTDOWN';
     this.ui.setState('PLAYING');
     this.lastTime = performance.now();
 
@@ -337,13 +341,32 @@ export class Game {
 
     if (deltaTime > 100) deltaTime = 16;
 
-    if (this.state === 'PLAYING') {
+    if (this.state === 'COUNTDOWN') {
+      this.updateCountdown(deltaTime);
+    } else if (this.state === 'PLAYING') {
       this.update(deltaTime, currentTime);
     }
 
     this.render(deltaTime);
 
     this.animationFrameId = requestAnimationFrame(() => this.gameLoop());
+  }
+
+  private updateCountdown(deltaTime: number): void {
+    this.countdownTimer += deltaTime;
+
+    if (this.countdownTimer >= 1000) {
+      this.countdownTimer = 0;
+      this.countdownNumber--;
+      this.audio.play('combo');
+
+      if (this.countdownNumber < 0) {
+        this.state = 'PLAYING';
+        this.physics.setSpeed(1);
+        this.lastTime = performance.now();
+        this.audio.play('level_complete');
+      }
+    }
   }
 
   private update(deltaTime: number, currentTime: number): void {
@@ -444,6 +467,11 @@ export class Game {
 
     this.renderer.drawParticles(this.particles.getParticles());
     this.renderer.drawComboText(this.particles.getComboTexts());
+
+    if (this.state === 'COUNTDOWN') {
+      const scale = 1 + Math.sin(this.countdownTimer / 100) * 0.1;
+      this.renderer.drawCountdown(this.countdownNumber, scale);
+    }
   }
 
   private renderMenuBackground(): void {

@@ -55,6 +55,7 @@ export class UIManager {
       case 'LEVEL_SELECT':
         this.levelSelect.show();
         break;
+      case 'COUNTDOWN':
       case 'PLAYING':
       case 'PAUSED':
         this.hud.show();
