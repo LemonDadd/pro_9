@@ -29,7 +29,10 @@ export class PhysicsEngine {
     this.centerY = centerY;
 
     this.engine = Engine.create({
-      gravity: { x: 0, y: PHYSICS.gravity, scale: 0.01 }
+      gravity: { x: 0, y: PHYSICS.gravity, scale: 0.005 },
+      positionIterations: 20,
+      velocityIterations: 20,
+      constraintIterations: 5
     });
     this.world = this.engine.world;
     this.runner = Runner.create();
@@ -177,10 +180,15 @@ export class PhysicsEngine {
 
   private createArcSegment(startAngle: number, endAngle: number, innerRadius: number, outerRadius: number): Matter.Body {
     const vertices: Matter.Vector[] = [];
-    const steps = Math.ceil((endAngle - startAngle) * 30);
+    let angleSpan = endAngle - startAngle;
+
+    if (angleSpan < 0) angleSpan += 2 * Math.PI;
+    while (angleSpan >= 2 * Math.PI) angleSpan -= 2 * Math.PI;
+
+    const steps = Math.max(80, Math.ceil(angleSpan * 180 / Math.PI * 2));
 
     for (let i = 0; i <= steps; i++) {
-      const angle = startAngle + (endAngle - startAngle) * (i / steps);
+      const angle = startAngle + angleSpan * (i / steps);
       vertices.push({
         x: this.centerX + outerRadius * Math.cos(angle),
         y: this.centerY + outerRadius * Math.sin(angle)
@@ -188,7 +196,7 @@ export class PhysicsEngine {
     }
 
     for (let i = steps; i >= 0; i--) {
-      const angle = startAngle + (endAngle - startAngle) * (i / steps);
+      const angle = startAngle + angleSpan * (i / steps);
       vertices.push({
         x: this.centerX + innerRadius * Math.cos(angle),
         y: this.centerY + innerRadius * Math.sin(angle)
@@ -197,11 +205,18 @@ export class PhysicsEngine {
 
     return Bodies.fromVertices(this.centerX, this.centerY, [vertices], {
       isStatic: true,
+      isSensor: false,
       restitution: PHYSICS.defaultRestitution,
       friction: PHYSICS.defaultFriction,
       frictionAir: 0,
-      label: 'ring'
-    });
+      frictionStatic: 0,
+      slop: 0,
+      label: 'ring',
+      collisionFilter: {
+        category: 0x0001,
+        mask: 0xFFFFFFFF
+      }
+    }, true);
   }
 
   updateGapRotation(deltaTime: number): void {
@@ -272,10 +287,14 @@ export class PhysicsEngine {
       friction,
       frictionAir,
       label: id.toString(),
+      slop: 0,
+      frictionStatic: 0,
       collisionFilter: {
         group: -1
       }
     });
+
+    (ball as any).isBullet = true;
 
     World.add(this.world, ball);
     return ball;

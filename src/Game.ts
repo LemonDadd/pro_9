@@ -86,7 +86,7 @@ export class Game {
 
   private setupInputHandlers(): void {
     this.input.onMove((current, delta) => {
-      if (this.state !== 'PLAYING' && this.state !== 'COUNTDOWN') return;
+      if (this.state !== 'PLAYING') return;
 
       const center = this.renderer.getCenter();
       const prevAngle = Math.atan2(current.y - delta.y - center.y, current.x - delta.x - center.x);
@@ -97,9 +97,9 @@ export class Game {
       if (deltaAngle < -Math.PI) deltaAngle += 2 * Math.PI;
 
       const sensitivity = GAME.ringRotationSensitivity;
-      const rotation = deltaAngle * sensitivity * 100;
+      const rotation = deltaAngle * sensitivity;
 
-      if (Math.abs(rotation) > 0.001) {
+      if (Math.abs(rotation) > 0.0001) {
         this.physics.rotateRing(rotation);
       }
     });
