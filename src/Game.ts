@@ -32,6 +32,7 @@ export class Game {
   private currentLevel: LevelConfig | null = null;
   private countdownTimer: number = 0;
   private countdownNumber: number = 3;
+  private lastMouseAngle: number | null = null;
 
   constructor(canvas: HTMLCanvasElement, appContainer: HTMLElement) {
     this.canvas = canvas;
@@ -85,16 +86,17 @@ export class Game {
   }
 
   private setupInputHandlers(): void {
-    let lastAngle: number | null = null;
-
     this.input.onMove((current, delta) => {
-      if (this.state !== 'PLAYING') return;
+      if (this.state !== 'PLAYING') {
+        this.lastMouseAngle = null;
+        return;
+      }
 
       const center = this.renderer.getCenter();
       const currentAngle = Math.atan2(current.y - center.y, current.x - center.x);
 
-      if (lastAngle !== null) {
-        let deltaAngle = currentAngle - lastAngle;
+      if (this.lastMouseAngle !== null) {
+        let deltaAngle = currentAngle - this.lastMouseAngle;
         if (deltaAngle > Math.PI) deltaAngle -= 2 * Math.PI;
         if (deltaAngle < -Math.PI) deltaAngle += 2 * Math.PI;
 
@@ -106,7 +108,7 @@ export class Game {
         }
       }
 
-      lastAngle = currentAngle;
+      this.lastMouseAngle = currentAngle;
     });
   }
 
@@ -130,6 +132,7 @@ export class Game {
     this.levelCompleteFlash = 0;
     this.countdownTimer = 0;
     this.countdownNumber = 3;
+    this.lastMouseAngle = null;
 
     const center = this.renderer.getCenter();
     this.physics.setupLevel(level, center.x, center.y);

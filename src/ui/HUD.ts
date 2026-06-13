@@ -50,13 +50,12 @@ export class HUD {
 
     const centerPanel = document.createElement('div');
     centerPanel.className = 'hud-panel center';
-    centerPanel.appendChild(this.goalElement);
+    centerPanel.appendChild(this.hitsElement);
+    centerPanel.appendChild(this.comboElement);
 
     const rightPanel = document.createElement('div');
     rightPanel.className = 'hud-panel right';
     rightPanel.appendChild(this.timeElement);
-    rightPanel.appendChild(this.hitsElement);
-    rightPanel.appendChild(this.comboElement);
 
     const buttonsPanel = document.createElement('div');
     buttonsPanel.className = 'hud-buttons';
@@ -85,11 +84,9 @@ export class HUD {
 
     const { goal } = level;
     const targetHits = goal.hitCount || 0;
-    const remaining = Math.max(0, targetHits - hitCount);
 
-    this.goalElement.textContent = `目标: 反弹 ${targetHits} 次`;
-    this.hitsElement.textContent = `已反弹: ${hitCount} / ${targetHits}`;
-    this.timeElement.textContent = `剩余: ${remaining} 次`;
+    this.hitsElement.textContent = `已反弹 ${hitCount} / ${targetHits}`;
+    this.timeElement.textContent = '';
 
     if (combo >= 2) {
       this.comboElement.textContent = `COMBO x${combo}`;

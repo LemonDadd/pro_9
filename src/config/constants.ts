@@ -15,15 +15,15 @@ export const COLORS = {
 };
 
 export const PHYSICS = {
-  gravity: 0,
-  defaultRestitution: 1.0,
-  defaultFriction: 0,
-  defaultFrictionAir: 0,
+  gravity: 0.5,
+  defaultRestitution: 0.9,
+  defaultFriction: 0.005,
+  defaultFrictionAir: 0.002,
   ringThickness: 20,
   ballRadius: 12,
-  constantBallSpeed: 12,
-  maxBallSpeed: 18,
-  minBallSpeed: 2
+  targetBallSpeed: 10,
+  maxBallSpeed: 15,
+  minBallSpeed: 3
 };
 
 export const RING_RADIUS: Record<string, number> = {
