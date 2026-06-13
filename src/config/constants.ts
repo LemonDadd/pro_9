@@ -15,12 +15,13 @@ export const COLORS = {
 };
 
 export const PHYSICS = {
-  gravity: 0.6,
-  defaultRestitution: 0.92,
-  defaultFriction: 0.002,
-  defaultFrictionAir: 0.001,
+  gravity: 0,
+  defaultRestitution: 1.0,
+  defaultFriction: 0,
+  defaultFrictionAir: 0,
   ringThickness: 20,
   ballRadius: 12,
+  constantBallSpeed: 12,
   maxBallSpeed: 18,
   minBallSpeed: 2
 };
@@ -46,7 +47,7 @@ export const GAME = {
   particleCount: 15,
   gapWarningAngle: 15 * Math.PI / 180,
   maxBalls: 6,
-  ringRotationSensitivity: 0.003
+  ringRotationSensitivity: 1.5
 };
 
 export const STORAGE_KEY = 'ring_gap_keeper_save';

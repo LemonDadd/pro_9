@@ -85,23 +85,28 @@ export class Game {
   }
 
   private setupInputHandlers(): void {
+    let lastAngle: number | null = null;
+
     this.input.onMove((current, delta) => {
       if (this.state !== 'PLAYING') return;
 
       const center = this.renderer.getCenter();
-      const prevAngle = Math.atan2(current.y - delta.y - center.y, current.x - delta.x - center.x);
       const currentAngle = Math.atan2(current.y - center.y, current.x - center.x);
 
-      let deltaAngle = currentAngle - prevAngle;
-      if (deltaAngle > Math.PI) deltaAngle -= 2 * Math.PI;
-      if (deltaAngle < -Math.PI) deltaAngle += 2 * Math.PI;
+      if (lastAngle !== null) {
+        let deltaAngle = currentAngle - lastAngle;
+        if (deltaAngle > Math.PI) deltaAngle -= 2 * Math.PI;
+        if (deltaAngle < -Math.PI) deltaAngle += 2 * Math.PI;
 
-      const sensitivity = GAME.ringRotationSensitivity;
-      const rotation = deltaAngle * sensitivity;
+        const sensitivity = GAME.ringRotationSensitivity;
+        const rotation = deltaAngle * sensitivity;
 
-      if (Math.abs(rotation) > 0.0001) {
-        this.physics.rotateRing(rotation);
+        if (Math.abs(rotation) > 0.0001) {
+          this.physics.rotateRing(rotation);
+        }
       }
+
+      lastAngle = currentAngle;
     });
   }
 

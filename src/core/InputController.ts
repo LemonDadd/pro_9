@@ -89,6 +89,16 @@ export class InputController {
     e.preventDefault();
     if (e.touches.length > 0) {
       const pos = this.getCanvasPosition(e.touches[0]);
+
+      if (this.lastMousePosition) {
+        const delta = {
+          x: pos.x - this.lastMousePosition.x,
+          y: pos.y - this.lastMousePosition.y
+        };
+        this.moveCallbacks.forEach((cb) => cb(pos, delta));
+      }
+      this.lastMousePosition = { ...pos };
+
       this.updateDrag(pos);
     }
   }

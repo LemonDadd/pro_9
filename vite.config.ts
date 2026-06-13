@@ -3,8 +3,11 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
   server: {
-    port: 5173,
-    open: true
+    port: 5174,
+    open: true,
+    hmr: {
+      port: 5174
+    }
   },
   plugins: [
     VitePWA({

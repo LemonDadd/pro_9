@@ -1,7 +1,7 @@
 import Matter from 'matter-js';
 import decomp from 'poly-decomp';
 import { PHYSICS, RING_RADIUS, COLORS } from '../config/constants';
-import { normalizeAngle, isAngleInRange, angleDistance, distance } from '../utils/math';
+import { normalizeAngle, isAngleInRange, angleDistance } from '../utils/math';
 import type { Gap, FailureInfo, CollisionEvent, LevelConfig, BallData } from '../types';
 
 Matter.Common.setDecomp(decomp);
@@ -23,21 +23,31 @@ export class PhysicsEngine {
   private centerX: number = 0;
   private centerY: number = 0;
   private ballColors: Map<number, string> = new Map();
+  private constantBallSpeed: number = PHYSICS.constantBallSpeed;
+  private ballInitialAngles: Map<number, number> = new Map();
 
   constructor(centerX: number, centerY: number) {
     this.centerX = centerX;
     this.centerY = centerY;
 
     this.engine = Engine.create({
-      gravity: { x: 0, y: PHYSICS.gravity, scale: 0.005 },
-      positionIterations: 20,
-      velocityIterations: 20,
-      constraintIterations: 5
+      gravity: { x: 0, y: 0, scale: 0 },
+      positionIterations: 40,
+      velocityIterations: 40,
+      constraintIterations: 10
     });
     this.world = this.engine.world;
     this.runner = Runner.create();
 
     this.setupCollisionDetection();
+    this.setupAfterUpdate();
+  }
+
+  private setupAfterUpdate(): void {
+    Events.on(this.engine, 'afterUpdate', () => {
+      this.maintainConstantSpeed();
+      this.preventBallPenetration();
+    });
   }
 
   private setupCollisionDetection(): void {
@@ -51,7 +61,6 @@ export class PhysicsEngine {
         const ringBody = this.ringBodies.includes(bodyA) ? bodyA : this.ringBodies.includes(bodyB) ? bodyB : null;
 
         if (ballBody && ringBody) {
-          const ballData = this.getBallData(ballBody);
           const collisionNormal = {
             x: ballBody.position.x - this.centerX,
             y: ballBody.position.y - this.centerY
@@ -60,6 +69,10 @@ export class PhysicsEngine {
           collisionNormal.x /= len;
           collisionNormal.y /= len;
 
+          this.reflectBallVelocity(ballBody, collisionNormal);
+          this.enforceBallInsideRing(ballBody);
+
+          const ballData = this.getBallData(ballBody);
           const collisionEvent: CollisionEvent = {
             ballId: parseInt(ballBody.label),
             speed: ballData.speed,
@@ -73,6 +86,43 @@ export class PhysicsEngine {
     });
   }
 
+  private reflectBallVelocity(ball: Matter.Body, normal: { x: number; y: number }): void {
+    const vx = ball.velocity.x;
+    const vy = ball.velocity.y;
+    const dot = vx * normal.x + vy * normal.y;
+
+    let reflectedVx = vx - 2 * dot * normal.x;
+    let reflectedVy = vy - 2 * dot * normal.y;
+
+    const speed = Math.sqrt(reflectedVx * reflectedVx + reflectedVy * reflectedVy);
+    if (speed > 0.001) {
+      reflectedVx = (reflectedVx / speed) * this.constantBallSpeed;
+      reflectedVy = (reflectedVy / speed) * this.constantBallSpeed;
+    } else {
+      const tangentX = -normal.y;
+      const tangentY = normal.x;
+      reflectedVx = tangentX * this.constantBallSpeed;
+      reflectedVy = tangentY * this.constantBallSpeed;
+    }
+
+    Body.setVelocity(ball, { x: reflectedVx, y: reflectedVy });
+  }
+
+  private enforceBallInsideRing(ball: Matter.Body): void {
+    const dx = ball.position.x - this.centerX;
+    const dy = ball.position.y - this.centerY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const maxDist = this.ringRadius - this.ringThickness - this.ballRadius - 1;
+
+    if (dist > maxDist) {
+      const angle = Math.atan2(dy, dx);
+      Body.setPosition(ball, {
+        x: this.centerX + Math.cos(angle) * maxDist,
+        y: this.centerY + Math.sin(angle) * maxDist
+      });
+    }
+  }
+
   setupLevel(levelConfig: LevelConfig, centerX: number, centerY: number): void {
     this.centerX = centerX;
     this.centerY = centerY;
@@ -84,7 +134,7 @@ export class PhysicsEngine {
     this.createBalls(levelConfig.ballCount, levelConfig.restitution, levelConfig.friction, levelConfig.frictionAir);
 
     this.engine.gravity.x = 0;
-    this.engine.gravity.y = PHYSICS.gravity;
+    this.engine.gravity.y = 0;
   }
 
   private clear(): void {
@@ -206,8 +256,8 @@ export class PhysicsEngine {
     return Bodies.fromVertices(this.centerX, this.centerY, [vertices], {
       isStatic: true,
       isSensor: false,
-      restitution: PHYSICS.defaultRestitution,
-      friction: PHYSICS.defaultFriction,
+      restitution: 1,
+      friction: 0,
       frictionAir: 0,
       frictionStatic: 0,
       slop: 0,
@@ -265,11 +315,16 @@ export class PhysicsEngine {
       const y = this.centerY + Math.sin(offsetAngle) * offsetDistance;
 
       const color = COLORS.ballColors[i % COLORS.ballColors.length];
-      const ball = this.createBall(x, y, color, restitution, friction, frictionAir, i);
+      const ball = this.createBall(x, y, color, 1, 0, 0, i);
       this.balls.push(ball);
       this.ballColors.set(i, color);
 
-      Body.setVelocity(ball, { x: 0, y: 0 });
+      const initAngle = offsetAngle + Math.PI / 2 + (i % 2 === 0 ? 0 : Math.PI);
+      this.ballInitialAngles.set(i, initAngle);
+      Body.setVelocity(ball, {
+        x: Math.cos(initAngle) * this.constantBallSpeed,
+        y: Math.sin(initAngle) * this.constantBallSpeed
+      });
     }
   }
 
@@ -283,15 +338,16 @@ export class PhysicsEngine {
     id: number
   ): Matter.Body {
     const ball = Bodies.circle(x, y, this.ballRadius, {
-      restitution,
-      friction,
-      frictionAir,
+      restitution: 1,
+      friction: 0,
+      frictionAir: 0,
       label: id.toString(),
       slop: 0,
       frictionStatic: 0,
       collisionFilter: {
         group: -1
-      }
+      },
+      inertia: Infinity
     });
 
     (ball as any).isBullet = true;
@@ -412,6 +468,80 @@ export class PhysicsEngine {
 
   update(deltaTime: number): void {
     Engine.update(this.engine, deltaTime);
+  }
+
+  private maintainConstantSpeed(): void {
+    for (const ball of this.balls) {
+      const vx = ball.velocity.x;
+      const vy = ball.velocity.y;
+      const currentSpeed = Math.sqrt(vx * vx + vy * vy);
+
+      if (currentSpeed > 0.001) {
+        const scale = this.constantBallSpeed / currentSpeed;
+        Body.setVelocity(ball, {
+          x: vx * scale,
+          y: vy * scale
+        });
+      } else {
+        const id = parseInt(ball.label);
+        const angle = this.ballInitialAngles.get(id) || Math.random() * Math.PI * 2;
+        Body.setVelocity(ball, {
+          x: Math.cos(angle) * this.constantBallSpeed,
+          y: Math.sin(angle) * this.constantBallSpeed
+        });
+      }
+    }
+  }
+
+  private preventBallPenetration(): void {
+    const minDist = this.ballRadius + 2;
+    const maxDist = this.ringRadius - this.ringThickness - this.ballRadius - 1;
+
+    for (const ball of this.balls) {
+      const dx = ball.position.x - this.centerX;
+      const dy = ball.position.y - this.centerY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const angle = Math.atan2(dy, dx);
+
+      if (dist > maxDist) {
+        let inGap = false;
+        for (const gap of this.gaps) {
+          if (isAngleInRange(angle, gap.startAngle, gap.endAngle)) {
+            inGap = true;
+            break;
+          }
+        }
+
+        if (!inGap) {
+          Body.setPosition(ball, {
+            x: this.centerX + Math.cos(angle) * maxDist,
+            y: this.centerY + Math.sin(angle) * maxDist
+          });
+
+          const normalX = dx / dist;
+          const normalY = dy / dist;
+          const dot = ball.velocity.x * normalX + ball.velocity.y * normalY;
+
+          if (dot > 0) {
+            let reflectedVx = ball.velocity.x - 2 * dot * normalX;
+            let reflectedVy = ball.velocity.y - 2 * dot * normalY;
+            const s = Math.sqrt(reflectedVx * reflectedVx + reflectedVy * reflectedVy);
+            if (s > 0.001) {
+              reflectedVx = (reflectedVx / s) * this.constantBallSpeed;
+              reflectedVy = (reflectedVy / s) * this.constantBallSpeed;
+            }
+            Body.setVelocity(ball, { x: reflectedVx, y: reflectedVy });
+          }
+        }
+      }
+
+      if (dist < minDist) {
+        Body.setPosition(ball, {
+          x: this.centerX + Math.cos(angle) * minDist,
+          y: this.centerY + Math.sin(angle) * minDist
+        });
+      }
+    }
   }
 
   resize(centerX: number, centerY: number): void {
