@@ -4,6 +4,65 @@ export function normalizeAngle(angle: number): number {
   return angle;
 }
 
+export interface Arc {
+  start: number;
+  end: number;
+}
+
+export function computeRingArcs(gaps: { startAngle: number; endAngle: number }[]): Arc[] {
+  const arcs: Arc[] = [];
+  const gapArcs: Arc[] = [];
+
+  const toPositive = (a: number): number => {
+    let result = a;
+    while (result < 0) result += 2 * Math.PI;
+    while (result >= 2 * Math.PI) result -= 2 * Math.PI;
+    return result;
+  };
+
+  for (const gap of gaps) {
+    let gapStart = toPositive(gap.startAngle);
+    let gapEnd = toPositive(gap.endAngle);
+
+    if (gapEnd < gapStart) {
+      gapEnd += 2 * Math.PI;
+    }
+
+    if (gapEnd - gapStart >= 2 * Math.PI - 0.001) {
+      continue;
+    }
+
+    if (gapEnd > 2 * Math.PI) {
+      gapArcs.push({ start: gapStart, end: 2 * Math.PI });
+      gapArcs.push({ start: 0, end: gapEnd - 2 * Math.PI });
+    } else {
+      gapArcs.push({ start: gapStart, end: gapEnd });
+    }
+  }
+
+  gapArcs.sort((a, b) => a.start - b.start);
+
+  let currentAngle = 0;
+  for (const gap of gapArcs) {
+    if (currentAngle < gap.start - 0.001) {
+      arcs.push({ start: currentAngle, end: gap.start });
+    }
+    currentAngle = Math.max(currentAngle, gap.end);
+  }
+
+  if (currentAngle < 2 * Math.PI - 0.001) {
+    arcs.push({ start: currentAngle, end: 2 * Math.PI });
+  }
+
+  for (let i = arcs.length - 1; i >= 0; i--) {
+    if (arcs[i].end - arcs[i].start < 0.001) {
+      arcs.splice(i, 1);
+    }
+  }
+
+  return arcs;
+}
+
 export function isAngleInRange(angle: number, start: number, end: number): boolean {
   const normAngle = normalizeAngle(angle);
   const normStart = normalizeAngle(start);

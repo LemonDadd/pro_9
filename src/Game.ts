@@ -368,6 +368,7 @@ export class Game {
         this.state = 'PLAYING';
         this.physics.setSpeed(1);
         this.lastTime = performance.now();
+        this.lastMouseAngle = null;
         this.audio.play('level_complete');
       }
     }

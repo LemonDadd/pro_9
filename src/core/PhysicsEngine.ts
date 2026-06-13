@@ -1,10 +1,7 @@
 import Matter from 'matter-js';
-import decomp from 'poly-decomp';
 import { PHYSICS, RING_RADIUS, COLORS } from '../config/constants';
-import { normalizeAngle, isAngleInRange, angleDistance } from '../utils/math';
+import { computeRingArcs, isAngleInRange, angleDistance } from '../utils/math';
 import type { Gap, FailureInfo, CollisionEvent, LevelConfig, BallData } from '../types';
-
-Matter.Common.setDecomp(decomp);
 
 const { Engine, World, Bodies, Body, Runner, Events, Composite } = Matter;
 
@@ -23,14 +20,17 @@ export class PhysicsEngine {
   private centerX: number = 0;
   private centerY: number = 0;
   private ballColors: Map<number, string> = new Map();
-  private targetBallSpeed: number = PHYSICS.targetBallSpeed;
+  private pendingRotation: number = 0;
+  private rotationAccumulator: number = 0;
+  private rotationThreshold: number = 0.01;
+  private levelRestitution: number = PHYSICS.defaultRestitution;
 
   constructor(centerX: number, centerY: number) {
     this.centerX = centerX;
     this.centerY = centerY;
 
     this.engine = Engine.create({
-      gravity: { x: 0, y: PHYSICS.gravity, scale: 0.005 },
+      gravity: { x: 0, y: 1, scale: 0.0015 },
       positionIterations: 30,
       velocityIterations: 30,
       constraintIterations: 10
@@ -45,7 +45,7 @@ export class PhysicsEngine {
   private setupAfterUpdate(): void {
     Events.on(this.engine, 'afterUpdate', () => {
       this.stabilizeBallSpeed();
-      this.preventBallPenetration();
+      this.applyPendingRotation();
     });
   }
 
@@ -53,32 +53,44 @@ export class PhysicsEngine {
     Events.on(this.engine, 'collisionStart', (event) => {
       const pairs = event.pairs;
 
-      pairs.forEach((pair) => {
+      for (const pair of pairs) {
         const { bodyA, bodyB } = pair;
 
         const ballBody = this.balls.includes(bodyA) ? bodyA : this.balls.includes(bodyB) ? bodyB : null;
         const ringBody = this.ringBodies.includes(bodyA) ? bodyA : this.ringBodies.includes(bodyB) ? bodyB : null;
 
         if (ballBody && ringBody) {
-          const collisionNormal = {
-            x: ballBody.position.x - this.centerX,
-            y: ballBody.position.y - this.centerY
-          };
-          const len = Math.sqrt(collisionNormal.x ** 2 + collisionNormal.y ** 2);
-          collisionNormal.x /= len;
-          collisionNormal.y /= len;
+          const collision = pair.collision;
+          let normal = { x: collision.normal.x, y: collision.normal.y };
+
+          if (this.balls.includes(bodyB)) {
+            normal = { x: -normal.x, y: -normal.y };
+          }
+
+          const supports = collision.supports;
+          if (supports && supports.length > 0) {
+            const contactPoint = supports[0];
+            const dx = ballBody.position.x - contactPoint.x;
+            const dy = ballBody.position.y - contactPoint.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist > 0.001) {
+              normal = { x: dx / dist, y: dy / dist };
+            }
+          }
 
           const ballData = this.getBallData(ballBody);
           const collisionEvent: CollisionEvent = {
             ballId: parseInt(ballBody.label),
             speed: ballData.speed,
-            position: { ...ballBody.position },
-            normal: collisionNormal
+            position: { x: ballBody.position.x, y: ballBody.position.y },
+            normal
           };
 
-          this.collisionCallbacks.forEach((cb) => cb(collisionEvent));
+          for (const cb of this.collisionCallbacks) {
+            cb(collisionEvent);
+          }
         }
-      });
+      }
     });
   }
 
@@ -104,42 +116,27 @@ export class PhysicsEngine {
     }
   }
 
-  private preventBallPenetration(): void {
-    const maxDist = this.ringRadius - this.ringThickness - this.ballRadius - 0.5;
+  private applyPendingRotation(): void {
+    if (Math.abs(this.pendingRotation) < this.rotationThreshold) return;
 
-    for (const ball of this.balls) {
-      const dx = ball.position.x - this.centerX;
-      const dy = ball.position.y - this.centerY;
-      const dist = Math.sqrt(dx * dx + dy * dy);
+    const rotation = this.pendingRotation;
+    this.pendingRotation = 0;
 
-      if (dist > maxDist) {
-        const angle = Math.atan2(dy, dx);
+    for (const body of this.ringBodies) {
+      Body.rotate(body, rotation, { x: this.centerX, y: this.centerY });
+    }
 
-        let inGap = false;
-        for (const gap of this.gaps) {
-          if (isAngleInRange(angle, gap.startAngle, gap.endAngle)) {
-            inGap = true;
-            break;
-          }
-        }
+    for (const config of this.gapConfigs) {
+      config.startAngle += rotation;
+    }
 
-        if (!inGap) {
-          Body.setPosition(ball, {
-            x: this.centerX + Math.cos(angle) * maxDist,
-            y: this.centerY + Math.sin(angle) * maxDist
-          });
-
-          const normalX = dx / dist;
-          const normalY = dy / dist;
-          const dot = ball.velocity.x * normalX + ball.velocity.y * normalY;
-
-          if (dot > 0) {
-            const reflectedVx = ball.velocity.x - 2 * dot * normalX;
-            const reflectedVy = ball.velocity.y - 2 * dot * normalY;
-            Body.setVelocity(ball, { x: reflectedVx, y: reflectedVy });
-          }
-        }
-      }
+    for (let i = 0; i < this.gaps.length; i++) {
+      const config = this.gapConfigs[i];
+      this.gaps[i] = {
+        startAngle: config.startAngle,
+        endAngle: config.startAngle + config.angleWidth,
+        centerAngle: config.startAngle + config.angleWidth / 2
+      };
     }
   }
 
@@ -148,13 +145,17 @@ export class PhysicsEngine {
     this.centerY = centerY;
     this.ringRadius = RING_RADIUS[levelConfig.ringRadius];
     this.gapConfigs = levelConfig.gaps.map((g) => ({ ...g }));
+    this.levelRestitution = Math.max(levelConfig.restitution, 0.9);
+    this.pendingRotation = 0;
+    this.rotationAccumulator = 0;
 
     this.clear();
     this.createRing();
     this.createBalls(levelConfig.ballCount);
 
     this.engine.gravity.x = 0;
-    this.engine.gravity.y = PHYSICS.gravity;
+    this.engine.gravity.y = 1;
+    this.engine.gravity.scale = 0.0015;
   }
 
   private clear(): void {
@@ -172,112 +173,36 @@ export class PhysicsEngine {
       centerAngle: config.startAngle + config.angleWidth / 2
     }));
 
-    const segments = this.createRingSegments();
-    segments.forEach((segment) => {
-      World.add(this.world, segment);
-      this.ringBodies.push(segment);
-    });
+    const solidArcs = computeRingArcs(this.gaps);
+    const segmentAngle = 3 * Math.PI / 180;
+
+    for (const arc of solidArcs) {
+      const arcSpan = arc.end - arc.start;
+      const segmentCount = Math.max(2, Math.ceil(arcSpan / segmentAngle));
+      const step = arcSpan / segmentCount;
+
+      for (let i = 0; i < segmentCount; i++) {
+        const angle = arc.start + step * (i + 0.5);
+        const segment = this.createRingSegment(angle, step * 1.05);
+        World.add(this.world, segment);
+        this.ringBodies.push(segment);
+      }
+    }
   }
 
-  private createRingSegments(): Matter.Body[] {
-    const segments: Matter.Body[] = [];
-    const outerRadius = this.ringRadius;
-    const innerRadius = this.ringRadius - this.ringThickness;
+  private createRingSegment(angle: number, widthAngle: number): Matter.Body {
+    const midRadius = this.ringRadius - this.ringThickness / 2;
+    const width = midRadius * widthAngle;
+    const height = this.ringThickness;
 
-    const toPositive = (a: number): number => {
-      while (a < 0) a += 2 * Math.PI;
-      while (a >= 2 * Math.PI) a -= 2 * Math.PI;
-      return a;
-    };
+    const x = this.centerX + Math.cos(angle) * midRadius;
+    const y = this.centerY + Math.sin(angle) * midRadius;
 
-    const gapRanges: { start: number; end: number }[] = [];
-
-    for (const gap of this.gaps) {
-      let gapStart = toPositive(gap.startAngle);
-      let gapEnd = toPositive(gap.endAngle);
-
-      if (gapEnd < gapStart) {
-        gapEnd += 2 * Math.PI;
-      }
-
-      if (gapEnd - gapStart >= 2 * Math.PI - 0.01) {
-        continue;
-      }
-
-      gapRanges.push({ start: gapStart, end: gapEnd });
-
-      if (gapEnd > 2 * Math.PI) {
-        gapRanges.push({ start: 0, end: gapEnd - 2 * Math.PI });
-        gapRanges[gapRanges.length - 2].end = 2 * Math.PI;
-      }
-    }
-
-    gapRanges.sort((a, b) => a.start - b.start);
-
-    const ringArcs: { start: number; end: number }[] = [];
-    let currentAngle = 0;
-
-    for (const gap of gapRanges) {
-      if (currentAngle < gap.start) {
-        ringArcs.push({ start: currentAngle, end: gap.start });
-      }
-      currentAngle = Math.max(currentAngle, gap.end);
-    }
-
-    if (currentAngle < 2 * Math.PI) {
-      ringArcs.push({ start: currentAngle, end: 2 * Math.PI });
-    }
-
-    for (let i = ringArcs.length - 1; i >= 0; i--) {
-      const arc = ringArcs[i];
-      if (arc.end - arc.start < 0.001) {
-        ringArcs.splice(i, 1);
-      }
-    }
-
-    ringArcs.forEach((arc) => {
-      const segment = this.createArcSegment(
-        arc.start - Math.PI,
-        arc.end - Math.PI,
-        innerRadius,
-        outerRadius
-      );
-      segments.push(segment);
-    });
-
-    return segments;
-  }
-
-  private createArcSegment(startAngle: number, endAngle: number, innerRadius: number, outerRadius: number): Matter.Body {
-    const vertices: Matter.Vector[] = [];
-    let angleSpan = endAngle - startAngle;
-
-    if (angleSpan < 0) angleSpan += 2 * Math.PI;
-    while (angleSpan >= 2 * Math.PI) angleSpan -= 2 * Math.PI;
-
-    const steps = Math.max(80, Math.ceil(angleSpan * 180 / Math.PI * 2));
-
-    for (let i = 0; i <= steps; i++) {
-      const angle = startAngle + angleSpan * (i / steps);
-      vertices.push({
-        x: this.centerX + outerRadius * Math.cos(angle),
-        y: this.centerY + outerRadius * Math.sin(angle)
-      });
-    }
-
-    for (let i = steps; i >= 0; i--) {
-      const angle = startAngle + angleSpan * (i / steps);
-      vertices.push({
-        x: this.centerX + innerRadius * Math.cos(angle),
-        y: this.centerY + innerRadius * Math.sin(angle)
-      });
-    }
-
-    return Bodies.fromVertices(this.centerX, this.centerY, [vertices], {
+    const segment = Bodies.rectangle(x, y, width, height, {
       isStatic: true,
       isSensor: false,
-      restitution: PHYSICS.defaultRestitution,
-      friction: PHYSICS.defaultFriction,
+      restitution: this.levelRestitution,
+      friction: 0,
       frictionAir: 0,
       frictionStatic: 0,
       slop: 0,
@@ -286,23 +211,29 @@ export class PhysicsEngine {
         category: 0x0001,
         mask: 0xFFFFFFFF
       }
-    }, true);
+    });
+
+    Body.rotate(segment, angle + Math.PI / 2, { x, y });
+
+    return segment;
   }
 
   updateGapRotation(deltaTime: number): void {
     let needsUpdate = false;
 
-    this.gapConfigs.forEach((config, index) => {
+    for (let i = 0; i < this.gapConfigs.length; i++) {
+      const config = this.gapConfigs[i];
       if (config.rotationSpeed) {
-        config.startAngle = normalizeAngle(config.startAngle + config.rotationSpeed * deltaTime);
-        this.gaps[index] = {
+        const delta = config.rotationSpeed * deltaTime;
+        config.startAngle += delta;
+        this.gaps[i] = {
           startAngle: config.startAngle,
           endAngle: config.startAngle + config.angleWidth,
           centerAngle: config.startAngle + config.angleWidth / 2
         };
         needsUpdate = true;
       }
-    });
+    }
 
     if (needsUpdate) {
       this.rebuildRing();
@@ -313,16 +244,26 @@ export class PhysicsEngine {
     const bodiesToRemove = [...this.ringBodies];
     this.ringBodies = [];
 
-    bodiesToRemove.forEach((body) => {
+    for (const body of bodiesToRemove) {
       Composite.remove(this.world, body, true);
-    });
+    }
 
-    const segments = this.createRingSegments();
-    segments.forEach((segment) => {
-      segment.id = Matter.Common.nextId();
-      World.add(this.world, segment);
-      this.ringBodies.push(segment);
-    });
+    const solidArcs = computeRingArcs(this.gaps);
+    const segmentAngle = 3 * Math.PI / 180;
+
+    for (const arc of solidArcs) {
+      const arcSpan = arc.end - arc.start;
+      const segmentCount = Math.max(2, Math.ceil(arcSpan / segmentAngle));
+      const step = arcSpan / segmentCount;
+
+      for (let i = 0; i < segmentCount; i++) {
+        const angle = arc.start + step * (i + 0.5);
+        const segment = this.createRingSegment(angle, step * 1.05);
+        segment.id = Matter.Common.nextId();
+        World.add(this.world, segment);
+        this.ringBodies.push(segment);
+      }
+    }
 
     this.engine.pairs.clear(this.engine.pairs);
   }
@@ -348,8 +289,8 @@ export class PhysicsEngine {
     id: number
   ): Matter.Body {
     const ball = Bodies.circle(x, y, this.ballRadius, {
-      restitution: PHYSICS.defaultRestitution,
-      friction: PHYSICS.defaultFriction,
+      restitution: this.levelRestitution,
+      friction: 0,
       frictionAir: PHYSICS.defaultFrictionAir,
       label: id.toString(),
       slop: 0,
@@ -366,16 +307,7 @@ export class PhysicsEngine {
   }
 
   rotateRing(deltaAngle: number): void {
-    this.gapConfigs.forEach((config, index) => {
-      config.startAngle = normalizeAngle(config.startAngle + deltaAngle);
-      this.gaps[index] = {
-        startAngle: config.startAngle,
-        endAngle: config.startAngle + config.angleWidth,
-        centerAngle: config.startAngle + config.angleWidth / 2
-      };
-    });
-
-    this.rebuildRing();
+    this.pendingRotation += deltaAngle;
   }
 
   checkFailure(): FailureInfo | null {
@@ -488,12 +420,12 @@ export class PhysicsEngine {
     this.centerX = centerX;
     this.centerY = centerY;
 
-    this.ringBodies.forEach((body) => {
+    for (const body of this.ringBodies) {
       Body.translate(body, { x: dx, y: dy });
-    });
+    }
 
-    this.balls.forEach((ball) => {
+    for (const ball of this.balls) {
       Body.translate(ball, { x: dx, y: dy });
-    });
+    }
   }
 }

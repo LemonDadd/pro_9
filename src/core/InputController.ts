@@ -85,7 +85,7 @@ export class InputController {
   }
 
   private handleTouchMove(e: TouchEvent): void {
-    if (this.isPaused || !this.isDragging) return;
+    if (this.isPaused) return;
     e.preventDefault();
     if (e.touches.length > 0) {
       const pos = this.getCanvasPosition(e.touches[0]);
@@ -99,7 +99,9 @@ export class InputController {
       }
       this.lastMousePosition = { ...pos };
 
-      this.updateDrag(pos);
+      if (this.isDragging) {
+        this.updateDrag(pos);
+      }
     }
   }
 

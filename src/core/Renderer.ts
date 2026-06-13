@@ -1,5 +1,5 @@
 import { COLORS } from '../config/constants';
-import { normalizeAngle } from '../utils/math';
+import { computeRingArcs } from '../utils/math';
 import type { BallData, TrailPoint, Particle, ComboText, Gap } from '../types';
 
 export class Renderer {
@@ -68,8 +68,8 @@ export class Renderer {
   }
 
   drawRing(radius: number, thickness: number, gaps: Gap[], pulseIntensity: number): void {
-    const outerRadius = radius;
-    const innerRadius = radius - thickness;
+    const solidArcs = computeRingArcs(gaps);
+    const midRadius = radius - thickness / 2;
 
     this.ctx.save();
 
@@ -85,33 +85,21 @@ export class Renderer {
     this.ctx.lineWidth = thickness;
     this.ctx.lineCap = 'round';
 
-    const sortedGaps = [...gaps].sort((a, b) => a.startAngle - b.startAngle);
-    let startAngle = -Math.PI;
+    for (const arc of solidArcs) {
+      this.ctx.beginPath();
+      this.ctx.arc(this.centerX, this.centerY, midRadius, arc.start, arc.end);
+      this.ctx.stroke();
+    }
 
-    sortedGaps.forEach((gap) => {
-      const gapStart = normalizeAngle(gap.startAngle);
-      const gapEnd = normalizeAngle(gap.endAngle);
+    for (const gap of gaps) {
+      this.drawGapEnd(gap.startAngle, radius, thickness, pulseIntensity);
+      this.drawGapEnd(gap.endAngle, radius, thickness, pulseIntensity);
+    }
 
-      if (startAngle < gapStart) {
-        this.ctx.beginPath();
-        this.ctx.arc(this.centerX, this.centerY, radius - thickness / 2, startAngle, gapStart);
-        this.ctx.stroke();
-      }
-
-      this.drawGapEnd(gapStart, radius, thickness, pulseIntensity);
-      this.drawGapEnd(gapEnd, radius, thickness, pulseIntensity);
-
-      if (pulseIntensity > 0) {
+    if (pulseIntensity > 0) {
+      for (const gap of gaps) {
         this.drawGapWarning(gap, radius, thickness, pulseIntensity);
       }
-
-      startAngle = gapEnd;
-    });
-
-    if (startAngle < Math.PI) {
-      this.ctx.beginPath();
-      this.ctx.arc(this.centerX, this.centerY, radius - thickness / 2, startAngle, Math.PI);
-      this.ctx.stroke();
     }
 
     this.ctx.restore();

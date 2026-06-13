@@ -47,7 +47,7 @@ export const GAME = {
   particleCount: 15,
   gapWarningAngle: 15 * Math.PI / 180,
   maxBalls: 6,
-  ringRotationSensitivity: 1.5
+  ringRotationSensitivity: 0.6
 };
 
 export const STORAGE_KEY = 'ring_gap_keeper_save';
