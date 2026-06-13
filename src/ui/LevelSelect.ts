@@ -20,6 +20,7 @@ export class LevelSelect {
     this.levelsContainer.className = 'levels-grid';
 
     this.backButton = document.createElement('button');
+    this.backButton.type = 'button';
     this.backButton.className = 'menu-button secondary';
     this.backButton.textContent = '返回主菜单';
 
@@ -102,7 +103,10 @@ export class LevelSelect {
   }
 
   onBackClick(callback: () => void): void {
-    this.backButton.addEventListener('click', callback);
+    this.backButton.addEventListener('click', (e) => {
+      e.preventDefault();
+      callback();
+    });
   }
 
   getElement(): HTMLElement {

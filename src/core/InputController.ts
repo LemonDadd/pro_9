@@ -51,7 +51,6 @@ export class InputController {
 
   private handleMouseMove(e: MouseEvent): void {
     if (this.isPaused) return;
-    e.preventDefault();
     const pos = this.getCanvasPosition(e);
 
     if (this.lastMousePosition) {

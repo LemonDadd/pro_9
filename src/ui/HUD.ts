@@ -36,10 +36,12 @@ export class HUD {
     this.comboElement.className = 'hud-combo';
 
     this.pauseButton = document.createElement('button');
+    this.pauseButton.type = 'button';
     this.pauseButton.className = 'hud-button pause-button';
     this.pauseButton.innerHTML = '⏸';
 
     this.soundButton = document.createElement('button');
+    this.soundButton.type = 'button';
     this.soundButton.className = 'hud-button sound-button';
     this.soundButton.innerHTML = '🔊';
 
@@ -97,11 +99,15 @@ export class HUD {
   }
 
   onPauseClick(callback: () => void): void {
-    this.pauseButton.addEventListener('click', callback);
+    this.pauseButton.addEventListener('click', (e) => {
+      e.preventDefault();
+      callback();
+    });
   }
 
   onSoundClick(callback: (enabled: boolean) => void): void {
-    this.soundButton.addEventListener('click', () => {
+    this.soundButton.addEventListener('click', (e) => {
+      e.preventDefault();
       this.soundEnabled = !this.soundEnabled;
       this.soundButton.innerHTML = this.soundEnabled ? '🔊' : '🔇';
       callback(this.soundEnabled);

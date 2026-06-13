@@ -58,6 +58,7 @@ export class LevelComplete {
 
   private createButton(text: string, variant: 'primary' | 'secondary'): HTMLButtonElement {
     const button = document.createElement('button');
+    button.type = 'button';
     button.className = `menu-button ${variant}`;
     button.textContent = text;
     return button;
@@ -72,15 +73,24 @@ export class LevelComplete {
   }
 
   onNextClick(callback: () => void): void {
-    this.nextButton.addEventListener('click', callback);
+    this.nextButton.addEventListener('click', (e) => {
+      e.preventDefault();
+      callback();
+    });
   }
 
   onRetryClick(callback: () => void): void {
-    this.retryButton.addEventListener('click', callback);
+    this.retryButton.addEventListener('click', (e) => {
+      e.preventDefault();
+      callback();
+    });
   }
 
   onMenuClick(callback: () => void): void {
-    this.menuButton.addEventListener('click', callback);
+    this.menuButton.addEventListener('click', (e) => {
+      e.preventDefault();
+      callback();
+    });
   }
 
   getElement(): HTMLElement {

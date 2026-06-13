@@ -123,7 +123,15 @@ export class PhysicsEngine {
     this.pendingRotation = 0;
 
     for (const body of this.ringBodies) {
-      Body.rotate(body, rotation, { x: this.centerX, y: this.centerY });
+      const dx = body.position.x - this.centerX;
+      const dy = body.position.y - this.centerY;
+      const cos = Math.cos(rotation);
+      const sin = Math.sin(rotation);
+      const newX = this.centerX + dx * cos - dy * sin;
+      const newY = this.centerY + dx * sin + dy * cos;
+
+      Body.setPosition(body, { x: newX, y: newY });
+      Body.setAngle(body, body.angle + rotation);
     }
 
     for (const config of this.gapConfigs) {
@@ -213,7 +221,7 @@ export class PhysicsEngine {
       }
     });
 
-    Body.rotate(segment, angle + Math.PI / 2, { x, y });
+    Body.setAngle(segment, angle + Math.PI / 2);
 
     return segment;
   }

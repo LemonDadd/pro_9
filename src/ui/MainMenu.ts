@@ -63,6 +63,7 @@ export class MainMenu {
 
   private createButton(text: string, variant: 'primary' | 'secondary'): HTMLButtonElement {
     const button = document.createElement('button');
+    button.type = 'button';
     button.className = `menu-button ${variant}`;
     button.textContent = text;
     return button;
@@ -105,7 +106,8 @@ export class MainMenu {
     `;
 
     const closeButton = this.createButton('关闭', 'secondary');
-    closeButton.addEventListener('click', () => {
+    closeButton.addEventListener('click', (e) => {
+      e.preventDefault();
       panel.style.display = 'none';
     });
 
@@ -136,14 +138,16 @@ export class MainMenu {
 
     const resetButton = this.createButton('重置进度', 'secondary');
     resetButton.style.marginTop = '20px';
-    resetButton.addEventListener('click', () => {
+    resetButton.addEventListener('click', (e) => {
+      e.preventDefault();
       if (confirm('确定要重置所有游戏进度吗？此操作不可恢复！')) {
         this.dispatchEvent('resetProgress');
       }
     });
 
     const closeButton = this.createButton('关闭', 'secondary');
-    closeButton.addEventListener('click', () => {
+    closeButton.addEventListener('click', (e) => {
+      e.preventDefault();
       panel.style.display = 'none';
     });
 
@@ -194,22 +198,30 @@ export class MainMenu {
   }
 
   onStartClick(callback: () => void): void {
-    this.startButton.addEventListener('click', callback);
+    this.startButton.addEventListener('click', (e) => {
+      e.preventDefault();
+      callback();
+    });
   }
 
   onLevelSelectClick(callback: () => void): void {
-    this.levelSelectButton.addEventListener('click', callback);
+    this.levelSelectButton.addEventListener('click', (e) => {
+      e.preventDefault();
+      callback();
+    });
   }
 
   onSettingsClick(callback: () => void): void {
-    this.settingsButton.addEventListener('click', () => {
+    this.settingsButton.addEventListener('click', (e) => {
+      e.preventDefault();
       this.settingsPanel.style.display = 'flex';
       callback();
     });
   }
 
   onHelpClick(callback: () => void): void {
-    this.helpButton.addEventListener('click', () => {
+    this.helpButton.addEventListener('click', (e) => {
+      e.preventDefault();
       this.helpPanel.style.display = 'flex';
       callback();
     });
